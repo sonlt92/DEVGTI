@@ -1,28 +1,33 @@
-# Use a Node.js base image
-FROM node:16 as builder
+FROM node:16
 
-# Set the working directory inside the container
-WORKDIR /app
+WORKDIR /usr
 
-# Copy the package.json and package-lock.json files to the container
-COPY package*.json ./
+COPY package.json ./
+
 COPY tsconfig.json ./
 COPY tsconfig.node.json ./
+COPY src ./src
 COPY index.html ./
-COPY ./ ./
-COPY deploy/ ./
-RUN npm i 
-RUN npm run build
-RUN ls
-FROM nginx:1.16.0-alpine
- 
-COPY --from=builder /app/dist /var/www/html
-RUN ls /var/www/html
-RUN rm /etc/nginx/conf.d/default.conf
+RUN ls -a
 
-COPY deploy/nginx/nginx.conf /etc/nginx/conf.d
+RUN npm install
+
+RUN npm run build
+
+## this is stage two , where the app actually runs
+
+FROM node:16
+
+WORKDIR /usr
+
+COPY package.json ./
+
+RUN npm install --only=production
+
+COPY --from=0 /usr/dist .
+
+RUN npm install pm2 -g
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon on;"]
-
+CMD ["pm2-runtime","app.js"]
